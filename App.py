@@ -32,7 +32,7 @@ h1 {
 """, unsafe_allow_html=True)
 
 # Load dataset
-df = pd.read_csv(r"C:\Users\amaky\OneDrive\Desktop\Movie_Recommender_system\movie_dataset (3).csv")
+df = pd.read_csv("movie_dataset (3).csv")
 
 features = ['keywords', 'cast', 'genres', 'director']
 
