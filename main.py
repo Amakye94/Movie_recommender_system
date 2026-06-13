@@ -6,23 +6,43 @@ import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from nicegui import ui
 
+
+
 # =====================================
 # TMDB CONFIG
 # =====================================
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
 
+if TMDB_API_KEY:
+    print("TMDB Key Found")
+else:
+    print("TMDB Key NOT Found")
+
+
 def get_movie_info(movie_title):
 
     try:
 
         url = (
-            f"https://api.themoviedb.org/3/search/movie"
+            "https://api.themoviedb.org/3/search/movie"
             f"?api_key={TMDB_API_KEY}"
             f"&query={movie_title}"
         )
 
-        response = requests.get(url)
+        response = requests.get(
+            url,
+            timeout=10
+        )
+
+        if response.status_code != 200:
+
+            print(
+                "TMDB API Error:",
+                response.status_code
+            )
+
+            return None
 
         data = response.json()
 
@@ -41,7 +61,6 @@ def get_movie_info(movie_title):
             )
 
         return {
-
             "overview": movie.get(
                 "overview",
                 "No description available."
@@ -62,9 +81,14 @@ def get_movie_info(movie_title):
 
     except Exception as e:
 
-        print("TMDB Error:", e)
+        print(
+            "TMDB Error:",
+            e
+        )
 
         return None
+
+
 
 # =====================================
 # LOAD MOVIELENS DATA
@@ -232,7 +256,58 @@ results_container = ui.column().classes(
 # =====================================
 # DISPLAY RECOMMENDATIONS
 # =====================================
+def get_movie_trailer(movie_title):
 
+    try:
+
+        search_url = (
+            f"https://api.themoviedb.org/3/search/movie"
+            f"?api_key={TMDB_API_KEY}"
+            f"&query={movie_title}"
+        )
+
+        movie_data = requests.get(
+            search_url
+        ).json()
+
+        if not movie_data["results"]:
+            return None
+
+        movie_id = movie_data["results"][0]["id"]
+
+        video_url = (
+            f"https://api.themoviedb.org/3/movie/"
+            f"{movie_id}/videos"
+            f"?api_key={TMDB_API_KEY}"
+        )
+
+        videos = requests.get(
+            video_url
+        ).json()
+
+        for video in videos["results"]:
+
+            if (
+                video["site"] == "YouTube"
+                and video["type"] == "Trailer"
+            ):
+
+                return (
+                    "https://www.youtube.com/watch?v="
+                    + video["key"]
+                )
+
+        return None
+
+    except Exception as e:
+
+        print(
+            "Trailer Error:",
+            e
+        )
+
+        return None
+    
 def show_recommendations():
 
     results_container.clear()
@@ -275,7 +350,9 @@ def show_recommendations():
                     "text-h6 font-bold"
                 )
 
-                clean_title = movie.split(" (")[0]
+                clean_title = movie.split(
+                    " ("
+                )[0].strip()
 
                 movie_info = get_movie_info(
                     clean_title
@@ -311,6 +388,19 @@ def show_recommendations():
                     f"🔥 Recommendation Score: {score:.3f}"
                 )
 
+                trailer_url = get_movie_trailer(
+                    clean_title
+                )
+
+                if trailer_url:
+
+                    ui.link(
+                        "🎥 Watch Trailer",
+                        trailer_url
+                    ).classes(
+                        "text-blue"
+                    )
+   
 # =====================================
 # BUTTON
 # =====================================
@@ -319,6 +409,7 @@ ui.button(
     "🚀 Get Recommendations",
     on_click=show_recommendations
 )
+
 
 # =====================================
 # RUN APP
