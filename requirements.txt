@@ -1,7 +1,5 @@
 nicegui
 pandas
 numpy
-scikit-surprise
-sentence-transformers
 scikit-learn
-torch
+joblib
