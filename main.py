@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import joblib
 
 from sklearn.metrics.pairwise import cosine_similarity
 from nicegui import ui
@@ -64,19 +63,7 @@ movies["content"] = (
 print("Content column created")
 
 # =====================================
-# LOAD PRE-TRAINED SVD MODEL
-# =====================================
-
-print("Loading SVD model...")
-
-model = joblib.load(
-    "svd_model.pkl"
-)
-
-print("SVD model loaded")
-
-# =====================================
-# LOAD PRE-COMPUTED EMBEDDINGS
+# LOAD PRECOMPUTED EMBEDDINGS
 # =====================================
 
 print("Loading embeddings...")
@@ -88,7 +75,7 @@ embeddings = np.load(
 print("Embeddings loaded")
 
 # =====================================
-# HYBRID RECOMMENDATION FUNCTION
+# RECOMMENDATION FUNCTION
 # =====================================
 
 def recommend_movies(movie_title):
@@ -125,11 +112,11 @@ def recommend_movies(movie_title):
             3.0
         )
 
-        bert_score = similarities[idx]
+        similarity_score = similarities[idx]
 
         hybrid_score = (
             0.7 * (rating_score / 5)
-            + 0.3 * bert_score
+            + 0.3 * similarity_score
         )
 
         recommendations.append(
@@ -147,7 +134,7 @@ def recommend_movies(movie_title):
     return recommendations[:10]
 
 # =====================================
-# NICEGUI INTERFACE
+# NICEGUI UI
 # =====================================
 
 ui.colors(primary="#E50914")
@@ -163,7 +150,7 @@ with ui.column().classes(
     )
 
     ui.label(
-        "MovieLens 1M + BERT + Hybrid Recommendation"
+        "MovieLens 1M + Embedding Similarity"
     ).classes(
         "text-subtitle1"
     )
@@ -224,7 +211,7 @@ def show_recommendations():
                 )
 
                 ui.label(
-                    f"Hybrid Score: {score:.3f}"
+                    f"Score: {score:.3f}"
                 )
 
 ui.button(
@@ -238,4 +225,3 @@ ui.run(
     title="Hybrid Movie Recommender",
     reload=False
 )
-
