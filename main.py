@@ -1,13 +1,8 @@
-
 import pandas as pd
 import numpy as np
 import os
+import joblib
 
-from surprise import Dataset
-from surprise import Reader
-from surprise import SVD
-
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from nicegui import ui
 
@@ -43,6 +38,20 @@ print("Movies:", len(movies))
 print("Ratings:", len(ratings))
 
 # =====================================
+# CREATE AVERAGE RATINGS DICTIONARY
+# =====================================
+
+movie_avg_ratings = (
+    ratings.groupby("movieId")["rating"]
+    .mean()
+    .to_dict()
+)
+
+del ratings
+
+print("Average ratings dictionary created")
+
+# =====================================
 # CREATE CONTENT COLUMN
 # =====================================
 
@@ -55,73 +64,28 @@ movies["content"] = (
 print("Content column created")
 
 # =====================================
-# TRAIN SVD MODEL
+# LOAD PRE-TRAINED SVD MODEL
 # =====================================
 
-reader = Reader(
-    rating_scale=(1, 5)
+print("Loading SVD model...")
+
+model = joblib.load(
+    "svd_model.pkl"
 )
 
-data = Dataset.load_from_df(
-    ratings[
-        ["userId", "movieId", "rating"]
-    ],
-    reader
+print("SVD model loaded")
+
+# =====================================
+# LOAD PRE-COMPUTED EMBEDDINGS
+# =====================================
+
+print("Loading embeddings...")
+
+embeddings = np.load(
+    "embeddings.npy"
 )
 
-trainset = data.build_full_trainset()
-
-model = SVD()
-
-print("Training SVD...")
-
-model.fit(trainset)
-
-print("SVD Training Complete!")
-
-# =====================================
-# LOAD BERT MODEL
-# =====================================
-
-print("Loading BERT model...")
-
-bert_model = SentenceTransformer(
-    "all-MiniLM-L6-v2"
-)
-
-# =====================================
-# LOAD OR CREATE EMBEDDINGS
-# =====================================
-
-if os.path.exists("embeddings.npy"):
-
-    embeddings = np.load(
-        "embeddings.npy"
-    )
-
-    print(
-        "Embeddings loaded from cache"
-    )
-
-else:
-
-    print(
-        "Generating embeddings..."
-    )
-
-    embeddings = bert_model.encode(
-        movies["content"].tolist(),
-        show_progress_bar=True
-    )
-
-    np.save(
-        "embeddings.npy",
-        embeddings
-    )
-
-    print(
-        "Embeddings generated and saved"
-    )
+print("Embeddings loaded")
 
 # =====================================
 # HYBRID RECOMMENDATION FUNCTION
@@ -156,14 +120,10 @@ def recommend_movies(movie_title):
 
         movie_id = row["movieId"]
 
-        avg_rating = ratings[
-            ratings["movieId"] == movie_id
-        ]["rating"].mean()
-
-        if pd.isna(avg_rating):
-            avg_rating = 3.0
-
-        rating_score = avg_rating
+        rating_score = movie_avg_ratings.get(
+            movie_id,
+            3.0
+        )
 
         bert_score = similarities[idx]
 
@@ -190,35 +150,35 @@ def recommend_movies(movie_title):
 # NICEGUI INTERFACE
 # =====================================
 
-ui.colors(primary='#E50914')
+ui.colors(primary="#E50914")
 
 with ui.column().classes(
-    'w-full items-center'
+    "w-full items-center"
 ):
 
     ui.label(
-        '🎬 Hybrid Movie Recommender System'
+        "🎬 Hybrid Movie Recommender System"
     ).classes(
-        'text-h3 font-bold'
+        "text-h3 font-bold"
     )
 
     ui.label(
-        'MovieLens 1M + BERT + Hybrid Recommendation'
+        "MovieLens 1M + BERT + Hybrid Recommendation"
     ).classes(
-        'text-subtitle1'
+        "text-subtitle1"
     )
 
 movie_dropdown = ui.select(
     options=sorted(
         movies["title"].tolist()
     ),
-    label='Select a Movie'
+    label="Select a Movie"
 ).classes(
-    'w-96'
+    "w-96"
 )
 
 results_container = ui.column().classes(
-    'w-full'
+    "w-full"
 )
 
 def show_recommendations():
@@ -228,8 +188,8 @@ def show_recommendations():
     if not movie_dropdown.value:
 
         ui.notify(
-            'Please select a movie',
-            color='negative'
+            "Please select a movie",
+            color="negative"
         )
 
         return
@@ -243,9 +203,9 @@ def show_recommendations():
         ui.separator()
 
         ui.label(
-            f'Recommendations for {movie_dropdown.value}'
+            f"Recommendations for {movie_dropdown.value}"
         ).classes(
-            'text-h5'
+            "text-h5"
         )
 
         for rank, (movie, score) in enumerate(
@@ -254,26 +214,28 @@ def show_recommendations():
         ):
 
             with ui.card().classes(
-                'w-full'
+                "w-full"
             ):
 
                 ui.label(
-                    f'#{rank} 🎬 {movie}'
+                    f"#{rank} 🎬 {movie}"
                 ).classes(
-                    'text-h6 font-bold'
+                    "text-h6 font-bold"
                 )
 
                 ui.label(
-                    f'Hybrid Score: {score:.3f}'
+                    f"Hybrid Score: {score:.3f}"
                 )
 
 ui.button(
-    '🚀 Get Recommendations',
+    "🚀 Get Recommendations",
     on_click=show_recommendations
 )
 
 ui.run(
-    title='Hybrid Movie Recommender',
-    reload=False,
-    port=8080
+    host="0.0.0.0",
+    port=int(os.environ.get("PORT", 8080)),
+    title="Hybrid Movie Recommender",
+    reload=False
 )
+
