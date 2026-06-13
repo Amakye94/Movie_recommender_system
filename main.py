@@ -1,12 +1,73 @@
 import pandas as pd
 import numpy as np
 import os
+import requests
 
 from sklearn.metrics.pairwise import cosine_similarity
 from nicegui import ui
 
 # =====================================
-# LOAD MOVIELENS 1M DATA
+# TMDB CONFIG
+# =====================================
+
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
+
+def get_movie_info(movie_title):
+
+    try:
+
+        url = (
+            f"https://api.themoviedb.org/3/search/movie"
+            f"?api_key={TMDB_API_KEY}"
+            f"&query={movie_title}"
+        )
+
+        response = requests.get(url)
+
+        data = response.json()
+
+        if len(data["results"]) == 0:
+            return None
+
+        movie = data["results"][0]
+
+        poster = None
+
+        if movie.get("poster_path"):
+
+            poster = (
+                "https://image.tmdb.org/t/p/w500"
+                + movie["poster_path"]
+            )
+
+        return {
+
+            "overview": movie.get(
+                "overview",
+                "No description available."
+            ),
+
+            "release_date": movie.get(
+                "release_date",
+                "Unknown"
+            ),
+
+            "rating": movie.get(
+                "vote_average",
+                "N/A"
+            ),
+
+            "poster": poster
+        }
+
+    except Exception as e:
+
+        print("TMDB Error:", e)
+
+        return None
+
+# =====================================
+# LOAD MOVIELENS DATA
 # =====================================
 
 movies = pd.read_csv(
@@ -37,7 +98,7 @@ print("Movies:", len(movies))
 print("Ratings:", len(ratings))
 
 # =====================================
-# CREATE AVERAGE RATINGS DICTIONARY
+# CREATE AVERAGE RATINGS
 # =====================================
 
 movie_avg_ratings = (
@@ -51,7 +112,7 @@ del ratings
 print("Average ratings dictionary created")
 
 # =====================================
-# CREATE CONTENT COLUMN
+# CONTENT COLUMN
 # =====================================
 
 movies["content"] = (
@@ -63,7 +124,7 @@ movies["content"] = (
 print("Content column created")
 
 # =====================================
-# LOAD PRECOMPUTED EMBEDDINGS
+# LOAD EMBEDDINGS
 # =====================================
 
 print("Loading embeddings...")
@@ -134,7 +195,7 @@ def recommend_movies(movie_title):
     return recommendations[:10]
 
 # =====================================
-# NICEGUI UI
+# UI DESIGN
 # =====================================
 
 ui.colors(primary="#E50914")
@@ -150,7 +211,7 @@ with ui.column().classes(
     )
 
     ui.label(
-        "MovieLens 1M + Embedding Similarity"
+        "MovieLens + TMDB Enhanced Recommendations"
     ).classes(
         "text-subtitle1"
     )
@@ -167,6 +228,10 @@ movie_dropdown = ui.select(
 results_container = ui.column().classes(
     "w-full"
 )
+
+# =====================================
+# DISPLAY RECOMMENDATIONS
+# =====================================
 
 def show_recommendations():
 
@@ -210,14 +275,54 @@ def show_recommendations():
                     "text-h6 font-bold"
                 )
 
-                ui.label(
-                    f"Score: {score:.3f}"
+                clean_title = movie.split(" (")[0]
+
+                movie_info = get_movie_info(
+                    clean_title
                 )
+
+                if movie_info:
+
+                    with ui.row():
+
+                        if movie_info["poster"]:
+
+                            ui.image(
+                                movie_info["poster"]
+                            ).classes(
+                                "w-40"
+                            )
+
+                        with ui.column():
+
+                            ui.label(
+                                f"⭐ TMDB Rating: {movie_info['rating']}"
+                            )
+
+                            ui.label(
+                                f"📅 Release Date: {movie_info['release_date']}"
+                            )
+
+                            ui.label(
+                                f"📝 {movie_info['overview']}"
+                            )
+
+                ui.label(
+                    f"🔥 Recommendation Score: {score:.3f}"
+                )
+
+# =====================================
+# BUTTON
+# =====================================
 
 ui.button(
     "🚀 Get Recommendations",
     on_click=show_recommendations
 )
+
+# =====================================
+# RUN APP
+# =====================================
 
 ui.run(
     host="0.0.0.0",
@@ -225,3 +330,4 @@ ui.run(
     title="Hybrid Movie Recommender",
     reload=False
 )
+
