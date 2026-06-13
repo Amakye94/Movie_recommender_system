@@ -2,3 +2,4 @@ nicegui
 pandas
 numpy
 scikit-learn
+requests
